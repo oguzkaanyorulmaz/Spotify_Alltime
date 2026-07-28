@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Backend/">
+    <Project Path="Backend/SpotifyAllTime.API/SpotifyAllTime.API.csproj" />
+    <Project Path="Backend/SpotifyAllTime.Application/SpotifyAllTime.Application.csproj" />
+    <Project Path="Backend/SpotifyAllTime.Domain/SpotifyAllTime.Domain.csproj" />
+    <Project Path="Backend/SpotifyAllTime.Infrastructure/SpotifyAllTime.Infrastructure.csproj" />
+  </Folder>
+</Solution>
