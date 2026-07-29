@@ -9,6 +9,9 @@
 **/bin/
 **/obj/
 
+# Secrets / local settings
+**/appsettings.Development.json
+
 # Node / React
 node_modules/
 dist/
