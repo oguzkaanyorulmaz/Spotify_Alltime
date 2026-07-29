@@ -44,6 +44,10 @@ public class TrackRepository : ITrackRepository
                 existing.ArtistName = track.ArtistName;
                 existing.AlbumName = track.AlbumName;
                 existing.PlayCount = track.PlayCount;
+                if (!string.IsNullOrEmpty(track.ImageUrl))
+                {
+                    existing.ImageUrl = track.ImageUrl;
+                }
             }
             else
             {
@@ -55,7 +59,6 @@ public class TrackRepository : ITrackRepository
 
     public async Task<List<Track>> GetTopTracksAsync(int count)
     {
-        // 1. Veri tabanında gruplayıp toplamları hesapla (SQL tarafında hızlıca çalışır)
         var groupedResult = await _context.Tracks
             .GroupBy(t => new { t.TrackName, t.ArtistName })
             .Select(g => new
@@ -63,7 +66,6 @@ public class TrackRepository : ITrackRepository
                 TrackName = g.Key.TrackName,
                 ArtistName = g.Key.ArtistName,
                 PlayCount = g.Sum(x => x.PlayCount),
-                // Çeviri hatası almamak için basit SQL fonksiyonları (MAX) kullanıyoruz:
                 SpotifyTrackUri = g.Max(x => x.SpotifyTrackUri),
                 AlbumName = g.Max(x => x.AlbumName)
             })
@@ -71,7 +73,6 @@ public class TrackRepository : ITrackRepository
             .Take(count)
             .ToListAsync();
 
-        // 2. Sonucu domain modelimize (Track) eşleyip geri döndür
         return groupedResult.Select(t => new Track
         {
             SpotifyTrackUri = t.SpotifyTrackUri,
@@ -80,5 +81,12 @@ public class TrackRepository : ITrackRepository
             AlbumName = t.AlbumName ?? string.Empty,
             PlayCount = t.PlayCount
         }).ToList();
+    }
+
+    public async Task RecalculateTrackPlayCountsAsync()
+    {
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE Tracks SET PlayCount = (SELECT COUNT(*) FROM StreamingRecords WHERE StreamingRecords.SpotifyTrackUri = Tracks.SpotifyTrackUri)"
+        );
     }
 }

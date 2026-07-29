@@ -1,4 +1,3 @@
-// Empty file
 using Microsoft.EntityFrameworkCore;
 using SpotifyAllTime.Domain.Entities;
 
@@ -39,14 +38,13 @@ public class SpotifyDbContext : DbContext
             entity.Property(e => e.ArtistName).HasMaxLength(300).IsRequired();
             entity.Property(e => e.AlbumName).HasMaxLength(300);
             entity.Property(e => e.PlayCount).HasDefaultValue(0);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
         });
 
         // StreamingRecord Yapılandırması
         modelBuilder.Entity<StreamingRecord>(entity =>
         {
             entity.HasKey(e => e.Id);
-            
-            // Aynı kullanıcının aynı şarkıyı aynı saniyede iki kez eklemesini engellemek için benzersiz index
             entity.HasIndex(e => new { e.SpotifyUserId, e.SpotifyTrackUri, e.PlayedAt }).IsUnique();
 
             entity.Property(e => e.SpotifyUserId).HasMaxLength(100).IsRequired();

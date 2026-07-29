@@ -35,7 +35,6 @@ public class RecentlyPlayedWorker : BackgroundService
                 var dbContext = scope.ServiceProvider.GetRequiredService<SpotifyDbContext>();
                 var syncService = scope.ServiceProvider.GetRequiredService<ISpotifySyncDomainService>();
 
-                // Sistemdeki tum kullanicilarin son caldiklarini guncelle
                 var users = await dbContext.SpotifyUsers.ToListAsync(stoppingToken);
 
                 foreach (var user in users)
@@ -53,11 +52,21 @@ public class RecentlyPlayedWorker : BackgroundService
             }
             catch (Exception ex)
             {
+                if (stoppingToken.IsCancellationRequested || ex is ObjectDisposedException)
+                {
+                    break;
+                }
                 _logger.LogError(ex, "Recently Played Worker ana dongusunde bir hata olustu.");
             }
 
-            // Her 30 dakikada bir kontrol et
-            await Task.Delay(TimeSpan.FromMinutes(30), stoppingToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromMinutes(30), stoppingToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
         }
 
         _logger.LogInformation("Recently Played Worker durduruluyor.");

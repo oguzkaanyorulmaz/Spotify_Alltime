@@ -11,4 +11,5 @@ public interface ITrackRepository
     Task UpdateAsync(Track track);
     Task BulkAddOrUpdateAsync(IEnumerable<Track> tracks);
     Task<List<Track>> GetTopTracksAsync(int count);
+    Task RecalculateTrackPlayCountsAsync();
 }

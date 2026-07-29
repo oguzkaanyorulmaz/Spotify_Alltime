@@ -2,6 +2,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SpotifyAllTime.Application.Interfaces;
 
+using Microsoft.Extensions.Options;
+using SpotifyAllTime.Infrastructure.Configuration;
+
 namespace SpotifyAllTime.API.Controllers;
 
 [ApiController]
@@ -9,19 +12,21 @@ namespace SpotifyAllTime.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly ISpotifyUserAppService _userAppService;
+    private readonly SpotifySettings _settings;
 
-    public AuthController(ISpotifyUserAppService userAppService)
+    public AuthController(ISpotifyUserAppService userAppService, IOptions<SpotifySettings> settings)
     {
         _userAppService = userAppService;
+        _settings = settings.Value;
     }
 
     [HttpGet("login-url")]
-    public IActionResult GetLoginUrl([FromQuery] string clientId, [FromQuery] string redirectUri)
+    public IActionResult GetLoginUrl([FromQuery] string redirectUri)
     {
-        var scopes = "user-read-private user-read-email user-read-recently-played playlist-modify-public playlist-modify-private";
-        var url = $"https://accounts.spotify.com/authorize?response_type=code&client_id={clientId}&scope={System.Web.HttpUtility.UrlEncode(scopes)}&redirect_uri={System.Web.HttpUtility.UrlEncode(redirectUri)}";
+        var scopes = "user-read-private user-read-email user-read-recently-played user-read-currently-playing user-read-playback-state playlist-modify-public playlist-modify-private";
+        var url = $"https://accounts.spotify.com/authorize?response_type=code&client_id={_settings.ClientId}&scope={Uri.EscapeDataString(scopes)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&show_dialog=true";
         
-        return Ok(new { Url = url });
+        return Ok(new { loginUrl = url });
     }
 
     [HttpPost("callback")]

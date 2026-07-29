@@ -27,7 +27,6 @@ public class PlaylistSyncJob : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            // Gece yarisina (00:00) kalan sureyi hesapla (Yerel saat dilimine gore UTC+3 olarak kabul edildi)
             var now = DateTime.UtcNow.AddHours(3);
             var nextMidnight = now.Date.AddDays(1);
             var delay = nextMidnight - now;

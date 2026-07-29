@@ -7,6 +7,8 @@ public class Track
     public string ArtistName { get; set; } = string.Empty;
     public string AlbumName { get; set; } = string.Empty;
     public int PlayCount { get; set; }
+    public string? ImageUrl { get; set; }
+
 
     public void IncrementPlayCount(int count = 1)
     {

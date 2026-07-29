@@ -120,6 +120,7 @@ public class HistoryIngestionDomainService : IHistoryIngestionDomainService
         {
             await _trackRepository.BulkAddOrUpdateAsync(tracksToSave.Values);
             await _streamingRecordRepository.BulkAddAsync(recordsToSave);
+            await _trackRepository.RecalculateTrackPlayCountsAsync();
         }
 
         return (importedCount, skippedCount);

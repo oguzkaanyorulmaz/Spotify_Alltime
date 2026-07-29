@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SpotifyAllTime.API.Middleware;
 using SpotifyAllTime.Application.Interfaces;
 using SpotifyAllTime.Application.Mappings;
@@ -8,6 +9,11 @@ using SpotifyAllTime.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Logging yapılandırması (EventLog kaynaklı kilitlenme ve çökmeleri engellemek için)
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
 // Controller Servisleri
 builder.Services.AddControllers();
 
@@ -17,7 +23,7 @@ builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
 // Domain Servisleri (Domain Services)
 builder.Services.AddScoped<IHistoryIngestionDomainService, HistoryIngestionDomainService>();
 builder.Services.AddScoped<ISpotifySyncDomainService, SpotifySyncDomainService>();
-builder.Services.AddScoped<IMetadataEnrichmentDomainService, MetadataEnrichmentDomainService>();
+
 
 // Uygulama Servisleri (Application App Services)
 builder.Services.AddScoped<ISpotifyUserAppService, SpotifyUserAppService>();
@@ -39,6 +45,35 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Veritabanı sayaç düzeltmesini ve kolon kontrolünü başlangıçta çalıştır
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var context = scope.ServiceProvider.GetRequiredService<SpotifyAllTime.Infrastructure.Persistence.SpotifyDbContext>();
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Tracks') AND name = 'ImageUrl') " +
+                "ALTER TABLE Tracks ADD ImageUrl NVARCHAR(500) NULL;"
+            );
+            Console.WriteLine("--> Tracks tablosuna ImageUrl sutunu basariyla eklendi / kontrol edildi.");
+        }
+        catch (Exception exCol)
+        {
+            Console.WriteLine($"--> ImageUrl sutunu kontrolu/eklenmesi sirasinda hata: {exCol.Message}");
+        }
+
+        var trackRepo = scope.ServiceProvider.GetRequiredService<SpotifyAllTime.Domain.Interfaces.Repositories.ITrackRepository>();
+        await trackRepo.RecalculateTrackPlayCountsAsync();
+        Console.WriteLine("--> Veritabanindaki tum sarki sayaclari ham dinleme verileriyle basariyla senkronize edildi!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"--> Sayac duzeltmesi sirasinda hata olustu: {ex.Message}");
+    }
+}
 
 // Küresel Hata Middleware'i
 app.UseMiddleware<GlobalExceptionMiddleware>();

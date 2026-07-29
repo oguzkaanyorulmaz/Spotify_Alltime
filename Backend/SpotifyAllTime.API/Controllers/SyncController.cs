@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using SpotifyAllTime.Application.DTOs;
 using SpotifyAllTime.Domain.Interfaces.DomainServices;
 
 namespace SpotifyAllTime.API.Controllers;
@@ -9,14 +10,10 @@ namespace SpotifyAllTime.API.Controllers;
 public class SyncController : ControllerBase
 {
     private readonly ISpotifySyncDomainService _syncDomainService;
-    private readonly IMetadataEnrichmentDomainService _metadataEnrichmentService;
 
-    public SyncController(
-        ISpotifySyncDomainService syncDomainService,
-        IMetadataEnrichmentDomainService metadataEnrichmentService)
+    public SyncController(ISpotifySyncDomainService syncDomainService)
     {
         _syncDomainService = syncDomainService;
-        _metadataEnrichmentService = metadataEnrichmentService;
     }
 
     [HttpPost("recently-played/{spotifyUserId}")]
@@ -29,14 +26,55 @@ public class SyncController : ControllerBase
     [HttpPost("playlist/{spotifyUserId}")]
     public async Task<IActionResult> TriggerPlaylistSync(string spotifyUserId)
     {
-        await _syncDomainService.SyncTop100PlaylistAsync(spotifyUserId);
-        return Ok(new { Message = "Midnight playlist sync triggered and completed successfully." });
+        var playlistId = await _syncDomainService.SyncTop100PlaylistAsync(spotifyUserId);
+        var playlistUrl = $"https://open.spotify.com/playlist/{playlistId}";
+        return Ok(new { Message = "Midnight playlist sync triggered and completed successfully.", PlaylistUrl = playlistUrl });
     }
 
-    [HttpPost("enrich/{spotifyUserId}")]
-    public async Task<IActionResult> TriggerMetadataEnrichment(string spotifyUserId, [FromQuery] int count = 500)
+    [HttpGet("currently-playing/{spotifyUserId}")]
+    public async Task<IActionResult> GetCurrentlyPlaying(string spotifyUserId)
     {
-        await _metadataEnrichmentService.EnrichTopTracksAsync(spotifyUserId, count);
-        return Ok(new { Message = $"Metadata enrichment triggered and completed successfully for top {count} tracks." });
+        var result = await _syncDomainService.GetCurrentlyPlayingAsync(spotifyUserId);
+        if (result == null) return NotFound("Currently playing data not found.");
+        return Ok(new 
+        { 
+            isPlaying = result.Value.IsPlaying, 
+            title = result.Value.Title, 
+            artist = result.Value.Artist, 
+            album = result.Value.Album, 
+            imageUrl = result.Value.ImageUrl 
+        });
+    }
+
+    [HttpPost("custom-playlist/{spotifyUserId}")]
+    public async Task<IActionResult> CreateCustomPlaylist(string spotifyUserId, [FromBody] CustomPlaylistRequest request)
+    {
+        try
+        {
+            var playlistId = await _syncDomainService.SyncCustomPlaylistAsync(
+                spotifyUserId,
+                request.PlaylistName,
+                request.StartYear,
+                request.EndYear,
+                request.IncludedArtists,
+                request.ExcludedArtists,
+                request.TrackCount,
+                request.FillMissing,
+                request.UseRandom
+            );
+            var playlistUrl = $"https://open.spotify.com/playlist/{playlistId}";
+            return Ok(new { Message = "Custom playlist created successfully.", PlaylistUrl = playlistUrl });
+        }
+        catch (System.Exception ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
+    [HttpGet("available-years/{spotifyUserId}")]
+    public async Task<IActionResult> GetAvailableYears(string spotifyUserId)
+    {
+        var years = await _syncDomainService.GetAvailableYearsAsync(spotifyUserId);
+        return Ok(years);
     }
 }
