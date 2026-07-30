@@ -24,11 +24,14 @@ public class SyncController : ControllerBase
     }
 
     [HttpPost("playlist/{spotifyUserId}")]
-    public async Task<IActionResult> TriggerPlaylistSync(string spotifyUserId)
+    public async Task<IActionResult> TriggerPlaylistSync(
+        string spotifyUserId,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate)
     {
-        var playlistId = await _syncDomainService.SyncTop100PlaylistAsync(spotifyUserId);
+        var playlistId = await _syncDomainService.SyncTop100PlaylistAsync(spotifyUserId, startDate, endDate);
         var playlistUrl = $"https://open.spotify.com/playlist/{playlistId}";
-        return Ok(new { Message = "Midnight playlist sync triggered and completed successfully.", PlaylistUrl = playlistUrl });
+        return Ok(new { Message = "Playlist sync triggered and completed successfully.", PlaylistUrl = playlistUrl });
     }
 
     [HttpGet("currently-playing/{spotifyUserId}")]

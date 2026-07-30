@@ -8,4 +8,8 @@ public class YearlyWrappedDto
     public int UniqueArtistsCount { get; set; }
     public string TopArtistName { get; set; } = string.Empty;
     public int TopArtistPlayCount { get; set; }
+    public string TopTrackTitle { get; set; } = string.Empty;
+    public string TopTrackArtistName { get; set; } = string.Empty;
+    public int TopTrackMinutesPlayed { get; set; }
+    public System.Collections.Generic.List<GenreCountDto> TopGenres { get; set; } = new();
 }

@@ -14,6 +14,7 @@ public interface ISpotifyApiClient
     Task<List<(string TrackUri, string TrackName, string ArtistName, string ArtistId, string AlbumName)>> GetTracksMetadataAsync(IEnumerable<string> spotifyTrackIds, string accessToken);
     Task<Dictionary<string, List<string>>> GetArtistsGenresAsync(IEnumerable<string> artistIds, string accessToken);
     Task<string> CreatePlaylistAsync(string accessToken, string spotifyUserId, string name);
+    Task<(string? ImageUrl, List<string> Genres)> GetArtistDetailsAsync(string artistName, string accessToken);
     Task<(bool IsPlaying, string Title, string Artist, string Album, string? ImageUrl)?> GetCurrentlyPlayingAsync(string accessToken);
     Task<List<(string TrackUri, string? ImageUrl)>> GetTrackImagesAsync(IEnumerable<string> spotifyTrackIds, string accessToken);
 }

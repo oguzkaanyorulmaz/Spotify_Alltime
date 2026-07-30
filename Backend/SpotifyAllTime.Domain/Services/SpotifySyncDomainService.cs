@@ -87,7 +87,7 @@ public class SpotifySyncDomainService : ISpotifySyncDomainService
         }
     }
 
-    public async Task<string> SyncTop100PlaylistAsync(string spotifyUserId)
+    public async Task<string> SyncTop100PlaylistAsync(string spotifyUserId, DateTime? startDate = null, DateTime? endDate = null)
     {
         var user = await _userRepository.GetBySpotifyIdAsync(spotifyUserId);
         if (user == null) throw new Exception("Kullanıcı bulunamadı.");
@@ -99,22 +99,56 @@ public class SpotifySyncDomainService : ISpotifySyncDomainService
             await _userRepository.UpdateAsync(user);
         }
 
-        if (string.IsNullOrWhiteSpace(user.TargetPlaylistId))
+        string playlistName = "True All-Time Top 100";
+        string targetPlaylistId = string.Empty;
+
+        if (startDate.HasValue && endDate.HasValue)
         {
-            var playlistId = await _spotifyApiClient.CreatePlaylistAsync(user.AccessToken, user.SpotifyUserId, "True All-Time Top 100");
-            user.TargetPlaylistId = playlistId;
-            await _userRepository.UpdateAsync(user);
+            if (startDate.Value.Year == endDate.Value.Year && 
+                startDate.Value.Month == 1 && startDate.Value.Day == 1 && 
+                endDate.Value.Month == 12 && endDate.Value.Day == 31)
+            {
+                playlistName = $"True {startDate.Value.Year} Most Listened Songs";
+            }
+            else
+            {
+                playlistName = $"True Top 100 ({startDate.Value:yyyy-MM-dd} - {endDate.Value:yyyy-MM-dd})";
+            }
+            
+            targetPlaylistId = await _spotifyApiClient.CreatePlaylistAsync(user.AccessToken, user.SpotifyUserId, playlistName);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(user.TargetPlaylistId))
+            {
+                targetPlaylistId = await _spotifyApiClient.CreatePlaylistAsync(user.AccessToken, user.SpotifyUserId, playlistName);
+                user.TargetPlaylistId = targetPlaylistId;
+                await _userRepository.UpdateAsync(user);
+            }
+            else
+            {
+                targetPlaylistId = user.TargetPlaylistId;
+            }
         }
 
-        var topTracks = await _trackRepository.GetTopTracksAsync(100);
-        var trackUris = topTracks.Select(t => t.SpotifyTrackUri).ToList();
+        List<string> trackUris;
+        if (startDate.HasValue || endDate.HasValue)
+        {
+            var topTracks = await _streamingRecordRepository.GetTopTracksPagedAsync(spotifyUserId, startDate, endDate, 1, 100, "playcount");
+            trackUris = topTracks.Select(t => t.Track.SpotifyTrackUri).ToList();
+        }
+        else
+        {
+            var topTracks = await _trackRepository.GetTopTracksAsync(100);
+            trackUris = topTracks.Select(t => t.SpotifyTrackUri).ToList();
+        }
 
         if (trackUris.Any())
         {
-            await _spotifyApiClient.ReplacePlaylistItemsAsync(user.AccessToken, user.TargetPlaylistId, trackUris);
+            await _spotifyApiClient.ReplacePlaylistItemsAsync(user.AccessToken, targetPlaylistId, trackUris);
         }
 
-        return user.TargetPlaylistId;
+        return targetPlaylistId;
     }
 
     public async Task<(bool IsPlaying, string Title, string Artist, string Album, string? ImageUrl)?> GetCurrentlyPlayingAsync(string spotifyUserId)

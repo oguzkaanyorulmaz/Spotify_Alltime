@@ -13,5 +13,7 @@ public interface IStatsAppService
     Task<PagedResultDto<WrappedArtistDto>> GetTopArtistsPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy);
     Task<List<PeriodPlayCountDto>> GetTrackPlayHistoryAsync(string spotifyUserId, string trackUri);
     Task<List<PeriodPlayCountDto>> GetArtistPlayHistoryAsync(string spotifyUserId, string artistName);
+    Task<string?> GetLazyTrackImageAsync(string spotifyUserId, string trackId);
+    Task<string?> GetLazyArtistImageAsync(string spotifyUserId, string artistName);
 }
 

@@ -10,6 +10,7 @@ import {
     Flex,
     Heading,
     Icon,
+    Image,
     Input,
     SimpleGrid,
     Text,
@@ -19,7 +20,11 @@ import {
     Card,
     CardBody,
     Spinner,
+    Progress,
     HStack,
+    Avatar,
+    Skeleton,
+    SkeletonCircle,
     Modal,
     ModalOverlay,
     ModalContent,
@@ -37,6 +42,46 @@ import {
     IconButton
 } from '@chakra-ui/react'
 import { FaSignOutAlt, FaUpload, FaMusic, FaFilter, FaClock, FaUser, FaTrophy, FaCalendarAlt, FaHistory } from 'react-icons/fa'
+
+interface LazyArtistAvatarProps {
+    spotifyUserId: string;
+    artistName: string;
+    initialImageUrl?: string;
+    size?: string;
+    w?: string;
+    h?: string;
+    border?: string;
+}
+
+function LazyArtistAvatar({ spotifyUserId, artistName, initialImageUrl, size, w, h, border }: LazyArtistAvatarProps) {
+    const [imageUrl, setImageUrl] = useState<string | undefined>(initialImageUrl);
+
+    useEffect(() => {
+        setImageUrl(initialImageUrl);
+        if (!initialImageUrl) {
+            let isMounted = true;
+            ApiService.getLazyArtistImage(spotifyUserId, artistName)
+                .then(res => {
+                    if (isMounted && res.imageUrl) {
+                        setImageUrl(res.imageUrl);
+                    }
+                })
+                .catch(() => {});
+            return () => { isMounted = false; };
+        }
+    }, [initialImageUrl, artistName, spotifyUserId]);
+
+    return (
+        <Avatar
+            src={imageUrl}
+            name={artistName}
+            size={size}
+            w={w}
+            h={h}
+            border={border}
+        />
+    );
+}
 
 
 interface DashboardProps {
@@ -67,7 +112,7 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
 
-    
+
     // Custom Playlist Generator States
     const { isOpen: isCustomOpen, onOpen: onCustomOpen, onClose: onCustomClose } = useDisclosure();
     const [customPlaylistName, setCustomPlaylistName] = useState("Kişisel All-Time Karması");
@@ -144,12 +189,12 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
     const handleCreateCustomPlaylist = async () => {
         try {
             setCreatingCustom(true);
-            
-            const includedList = includedArtists 
-                ? includedArtists.split(",").map(x => x.trim()).filter(Boolean) 
+
+            const includedList = includedArtists
+                ? includedArtists.split(",").map(x => x.trim()).filter(Boolean)
                 : undefined;
-            const excludedList = excludedArtists 
-                ? excludedArtists.split(",").map(x => x.trim()).filter(Boolean) 
+            const excludedList = excludedArtists
+                ? excludedArtists.split(",").map(x => x.trim()).filter(Boolean)
                 : undefined;
 
             const res = await ApiService.createCustomPlaylist(session.spotifyUserId, {
@@ -168,17 +213,17 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                 description: (
                     <span>
                         "{customPlaylistName}" çalma listeniz başarıyla oluşturuldu.{" "}
-                        <a 
-                            href={res.playlistUrl.replace("https://open.spotify.com/playlist/", "spotify:playlist:")} 
+                        <a
+                            href={res.playlistUrl.replace("https://open.spotify.com/playlist/", "spotify:playlist:")}
                             style={{ textDecoration: 'underline', fontWeight: 'bold', color: '#10b981' }}
                         >
                             Uygulamada Aç ➜
                         </a>
                         {" veya "}
-                        <a 
-                            href={res.playlistUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+                        <a
+                            href={res.playlistUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             style={{ textDecoration: 'underline', fontWeight: 'bold', color: '#10b981' }}
                         >
                             Tarayıcıda Aç ➜
@@ -386,23 +431,45 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
     const handlePlaylistSync = async () => {
         try {
             setSyncingPlaylist(true);
-            const res = await ApiService.triggerPlaylistSync(session.spotifyUserId);
+            const { start, end } = getActiveDates();
+
+            if (periodType === "custom" && (!customStartDate || !customEndDate)) {
+                toast({
+                    title: "Tarih Seçimi Eksik",
+                    description: "Lütfen özel tarih aralığını belirleyin.",
+                    status: "warning",
+                    duration: 3000,
+                    isClosable: true,
+                });
+                setSyncingPlaylist(false);
+                return;
+            }
+
+            const res = await ApiService.triggerPlaylistSync(session.spotifyUserId, start, end);
+            
+            let listTypeLabel = "All-Time Top 100";
+            if (periodType === "year" && selectedYear) {
+                listTypeLabel = `${selectedYear} Yılı Top 100`;
+            } else if (periodType === "custom") {
+                listTypeLabel = "Özel Dönem Top 100";
+            }
+
             toast({
                 title: "Senkronizasyon Başarılı",
                 description: (
                     <span>
-                        All-Time Top 100 listeniz Spotify profilinize aktarıldı.{" "}
-                        <a 
-                            href={res.playlistUrl.replace("https://open.spotify.com/playlist/", "spotify:playlist:")} 
+                        {listTypeLabel} listeniz Spotify profilinize aktarıldı.{" "}
+                        <a
+                            href={res.playlistUrl.replace("https://open.spotify.com/playlist/", "spotify:playlist:")}
                             style={{ textDecoration: 'underline', fontWeight: 'bold', color: '#10b981' }}
                         >
                             Uygulamada Aç ➜
                         </a>
                         {" veya "}
-                        <a 
-                            href={res.playlistUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+                        <a
+                            href={res.playlistUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             style={{ textDecoration: 'underline', fontWeight: 'bold', color: '#10b981' }}
                         >
                             Tarayıcıda Aç ➜
@@ -502,7 +569,13 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                                 </Flex>
                                 <Box>
                                     <Heading size="xs" color="#111111" mb={1}>Çalma Listesi Eşitleme</Heading>
-                                    <Text fontSize="xs" color="#718096">Oluşan True Top 100 listesini Spotify hesabınıza eşitleyin.</Text>
+                                    <Text fontSize="xs" color="#718096">
+                                        {periodType === "year" && selectedYear
+                                            ? `Seçili ${selectedYear} yılı en çok dinlenen 100 şarkısını Spotify hesabınıza aktarın.`
+                                            : periodType === "custom"
+                                            ? "Seçili özel tarih aralığının en çok dinlenen 100 şarkısını Spotify hesabınıza aktarın."
+                                            : "All-Time en çok dinlenen 100 şarkınızı Spotify hesabınıza eşitleyin."}
+                                    </Text>
                                 </Box>
                                 <Button
                                     size="sm"
@@ -555,17 +628,17 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                 <Flex direction={{ base: "column", lg: "row" }} justify="space-between" align={{ base: "start", lg: "center" }} gap={4} mb={6}>
                     <VStack align="start" spacing={1}>
                         <Heading as="h2" size="md" fontWeight="bold" color="#111111">
-                            {periodType === "all" 
-                                ? "Tüm Zamanlar Dinleme Analiziniz" 
-                                : periodType === "year" && selectedYear 
-                                    ? `${selectedYear} Yılı Dinleme Analiziniz` 
+                            {periodType === "all"
+                                ? "Tüm Zamanlar Dinleme Analiziniz"
+                                : periodType === "year" && selectedYear
+                                    ? `${selectedYear} Yılı Dinleme Analiziniz`
                                     : "Özel Tarih Aralığı Analiziniz"}
                         </Heading>
                         <Text fontSize="xs" color="#718096">
-                            {periodType === "all" 
-                                ? "Tüm zamanlara ait özet verileriniz ve en çok dinlediğiniz şarkılar." 
-                                : periodType === "year" && selectedYear 
-                                    ? `${selectedYear} yılına ait özet verileriniz ve en çok dinlediğiniz şarkılar.` 
+                            {periodType === "all"
+                                ? "Tüm zamanlara ait özet verileriniz ve en çok dinlediğiniz şarkılar."
+                                : periodType === "year" && selectedYear
+                                    ? `${selectedYear} yılına ait özet verileriniz ve en çok dinlediğiniz şarkılar.`
                                     : `${customStartDate || '...'} ile ${customEndDate || '...'} tarihleri arasındaki özet verileriniz.`}
                         </Text>
                     </VStack>
@@ -574,7 +647,7 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                             <Icon as={FaCalendarAlt} color="#FDBB30" />
                             <Text fontSize="sm" fontWeight="bold" whiteSpace="nowrap" color="#1A1D20">Dönem:</Text>
                         </Flex>
-                        
+
                         <Select
                             value={periodType}
                             onChange={(e) => {
@@ -651,13 +724,13 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                             </HStack>
                         )}
 
-                        <Button 
-                            size="sm" 
-                            variant="outline" 
+                        <Button
+                            size="sm"
+                            variant="outline"
                             borderColor="#E4E7EB"
                             color="#1A1D20"
                             _hover={{ bg: "#F8FAFC" }}
-                            onClick={loadTracks} 
+                            onClick={loadTracks}
                             isDisabled={loadingTracks}
                         >
                             Yenile
@@ -747,10 +820,10 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                                     </Flex>
                                     <Box overflow="hidden">
                                         <Text fontSize="xs" color="#718096" fontWeight="medium" isTruncated>
-                                            Favori Şarkı {tracksPageData?.items?.[0] && `(${tracksPageData.items[0].totalMinutesPlayed} dk)`}
+                                            Favori Şarkı {wrappedData.topTrackTitle && `(${wrappedData.topTrackMinutesPlayed} dk)`}
                                         </Text>
-                                        <Heading size="sm" color="#111111" fontWeight="black" mt={0.5} isTruncated>
-                                            {tracksPageData?.items?.[0]?.title ?? 'Yükleniyor...'}
+                                        <Heading size="sm" color="#111111" fontWeight="black" mt={0.5} isTruncated title={`${wrappedData.topTrackTitle} - ${wrappedData.topTrackArtistName}`}>
+                                            {wrappedData.topTrackTitle || 'Bilinmiyor'}
                                         </Heading>
                                     </Box>
                                 </Flex>
@@ -804,10 +877,12 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                                 </HStack>
                             </Flex>
 
-                            <DashboardGrid 
-                                tracks={tracks} 
-                                startRank={(trackPage - 1) * 50 + 1} 
-                                onOpenAnalysis={handleOpenTrackAnalysis} 
+                            <DashboardGrid
+                                tracks={tracks}
+                                spotifyUserId={session.spotifyUserId}
+                                startRank={(trackPage - 1) * 50 + 1}
+                                onOpenAnalysis={handleOpenTrackAnalysis}
+                                isLoading={loadingTracksPage}
                             />
 
                             {tracksPageData && tracksPageData.totalPages > 1 && (
@@ -851,150 +926,213 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                         {/* Sağ Taraf: En Çok Dinlenen Sanatçılar */}
                         <Box opacity={loadingArtistsPage ? 0.6 : 1} transition="opacity 0.2s">
                             {artistsPageData?.items && artistsPageData.items.length > 0 && (
-                                <Card bg="white" border="1px solid #E4E7EB" shadow="sm" borderRadius="xl">
-                                    <CardBody p={4}>
-                                        <Flex align="center" justify="space-between" mb={4}>
-                                            <Heading as="h3" size="xs" fontWeight="bold" color="#111111" textTransform="uppercase" letterSpacing="wider">
-                                                Sanatçılar
-                                            </Heading>
-                                            <HStack spacing={1} bg="gray.100" p={0.5} borderRadius="lg">
-                                                <Button
-                                                    size="10px"
-                                                    h="20px"
-                                                    variant={artistSortBy === "playcount" ? "solid" : "ghost"}
-                                                    bg={artistSortBy === "playcount" ? "white" : "transparent"}
-                                                    color={artistSortBy === "playcount" ? "#1A1D20" : "gray.500"}
-                                                    shadow={artistSortBy === "playcount" ? "sm" : "none"}
-                                                    onClick={() => { setArtistPage(1); setArtistSortBy("playcount"); }}
-                                                    _hover={{ bg: artistSortBy === "playcount" ? "white" : "gray.200" }}
-                                                    borderRadius="md"
-                                                    px={2}
-                                                >
-                                                    Adet
-                                                </Button>
-                                                <Button
-                                                    size="10px"
-                                                    h="20px"
-                                                    variant={artistSortBy === "duration" ? "solid" : "ghost"}
-                                                    bg={artistSortBy === "duration" ? "white" : "transparent"}
-                                                    color={artistSortBy === "duration" ? "#1A1D20" : "gray.500"}
-                                                    shadow={artistSortBy === "duration" ? "sm" : "none"}
-                                                    onClick={() => { setArtistPage(1); setArtistSortBy("duration"); }}
-                                                    _hover={{ bg: artistSortBy === "duration" ? "white" : "gray.200" }}
-                                                    borderRadius="md"
-                                                    px={2}
-                                                >
-                                                    Süre
-                                                </Button>
-                                            </HStack>
-                                        </Flex>
-
-                                        <VStack align="stretch" spacing={2.5}>
-                                            {artistsPageData.items.map((artist, idx) => {
-                                                const currentRank = (artistPage - 1) * 10 + idx + 1;
-                                                return (
-                                                    <Flex 
-                                                        key={artist.artistName + idx} 
-                                                        align="center" 
-                                                        justify="space-between" 
-                                                        p={2} 
-                                                        borderRadius="lg" 
-                                                        _hover={{ bg: "#F8FAFC" }} 
-                                                        transition="background 0.2s"
-                                                    >
-                                                        <HStack spacing={3}>
-                                                            <Badge 
-                                                                variant="solid" 
-                                                                bg={currentRank === 1 ? "#FDBB30" : currentRank === 2 ? "#E2E8F0" : currentRank === 3 ? "#FEF3C7" : "gray.100"} 
-                                                                color={currentRank === 1 ? "#111" : currentRank === 3 ? "#B45309" : "#1A1D20"} 
-                                                                fontSize="10px" 
-                                                                borderRadius="md" 
-                                                                w="22px" 
-                                                                h="22px" 
-                                                                display="flex" 
-                                                                alignItems="center" 
-                                                                justifyContent="center"
-                                                            >
-                                                                #{currentRank}
-                                                            </Badge>
-                                                            <HStack spacing={1.5} align="center">
-                                                                <a
-                                                                    href={`spotify:search:${encodeURIComponent(artist.artistName)}`}
-                                                                    style={{ textDecoration: 'none' }}
-                                                                >
-                                                                    <Text 
-                                                                        fontSize="xs" 
-                                                                        fontWeight="semibold" 
-                                                                        color="#1A1D20" 
-                                                                        isTruncated 
-                                                                        maxW="110px"
-                                                                        _hover={{ color: '#10b981', textDecoration: 'underline' }}
-                                                                        transition="color 0.2s"
-                                                                        cursor="pointer"
-                                                                    >
-                                                                        {artist.artistName}
-                                                                    </Text>
-                                                                </a>
-                                                                <IconButton
-                                                                    aria-label="Sanatçı Dinleme Analizi"
-                                                                    icon={<FaHistory />}
-                                                                    size="xs"
-                                                                    variant="ghost"
-                                                                    color="gray.400"
-                                                                    _hover={{ color: "#10b981", bg: "rgba(16, 185, 129, 0.1)" }}
-                                                                    onClick={() => handleOpenArtistAnalysis(artist.artistName)}
-                                                                    h="18px"
-                                                                    w="18px"
-                                                                    minW="18px"
-                                                                />
+                                <>
+                                    <Flex align="center" justify="space-between" mb={3}>
+                                        <Heading as="h3" size="xs" fontWeight="bold" color="#111111" textTransform="uppercase" letterSpacing="wider">
+                                            Sanatçılar
+                                        </Heading>
+                                        <HStack spacing={1} bg="gray.100" p={0.5} borderRadius="lg">
+                                            <Button
+                                                size="xs"
+                                                variant={artistSortBy === "playcount" ? "solid" : "ghost"}
+                                                bg={artistSortBy === "playcount" ? "white" : "transparent"}
+                                                color={artistSortBy === "playcount" ? "#1A1D20" : "gray.500"}
+                                                shadow={artistSortBy === "playcount" ? "sm" : "none"}
+                                                onClick={() => { setArtistPage(1); setArtistSortBy("playcount"); }}
+                                                _hover={{ bg: artistSortBy === "playcount" ? "white" : "gray.200" }}
+                                                borderRadius="md"
+                                                px={3}
+                                            >
+                                                Adet
+                                            </Button>
+                                            <Button
+                                                size="xs"
+                                                variant={artistSortBy === "duration" ? "solid" : "ghost"}
+                                                bg={artistSortBy === "duration" ? "white" : "transparent"}
+                                                color={artistSortBy === "duration" ? "#1A1D20" : "gray.500"}
+                                                shadow={artistSortBy === "duration" ? "sm" : "none"}
+                                                onClick={() => { setArtistPage(1); setArtistSortBy("duration"); }}
+                                                _hover={{ bg: artistSortBy === "duration" ? "white" : "gray.200" }}
+                                                borderRadius="md"
+                                                px={3}
+                                            >
+                                                Süre
+                                            </Button>
+                                        </HStack>
+                                    </Flex>
+                                    <Card bg="white" border="1px solid #E4E7EB" shadow="sm" borderRadius="xl">
+                                        <CardBody p={4}>
+                                            <VStack align="stretch" spacing={2.5}>
+                                                {loadingArtistsPage ? (
+                                                    [...Array(10)].map((_, i) => (
+                                                        <Flex key={i} align="center" justify="space-between" p={2}>
+                                                            <HStack spacing={3}>
+                                                                <Skeleton w="22px" h="22px" borderRadius="md" />
+                                                                <SkeletonCircle size="28px" />
+                                                                <Skeleton h="14px" w="100px" borderRadius="md" />
                                                             </HStack>
-                                                        </HStack>
-                                                        <VStack align="end" spacing={0} flexShrink={0}>
-                                                            <Text fontSize="xs" fontWeight="bold" color="#111111">
-                                                                {artist.playCount} kez
-                                                            </Text>
-                                                            <Text fontSize="9px" color="gray.400">
-                                                                {artist.totalMinutesPlayed.toLocaleString('tr-TR')} dk
-                                                            </Text>
-                                                        </VStack>
-                                                    </Flex>
-                                                );
-                                            })}
-                                        </VStack>
+                                                            <VStack align="end" spacing={1} flexShrink={0}>
+                                                                <Skeleton h="12px" w="40px" borderRadius="md" />
+                                                                <Skeleton h="10px" w="30px" borderRadius="md" />
+                                                            </VStack>
+                                                        </Flex>
+                                                    ))
+                                                ) : (
+                                                    artistsPageData.items.map((artist, idx) => {
+                                                        const currentRank = (artistPage - 1) * 10 + idx + 1;
+                                                        return (
+                                                            <Flex
+                                                                key={artist.artistName + idx}
+                                                                align="center"
+                                                                justify="space-between"
+                                                                p={2}
+                                                                borderRadius="lg"
+                                                                _hover={{ bg: "#F8FAFC" }}
+                                                                transition="background 0.2s"
+                                                            >
+                                                                <HStack spacing={3}>
+                                                                    <Badge
+                                                                        variant="solid"
+                                                                        bg={currentRank === 1 ? "#FDBB30" : currentRank === 2 ? "#E2E8F0" : currentRank === 3 ? "#FEF3C7" : "gray.100"}
+                                                                        color={currentRank === 1 ? "#111" : currentRank === 3 ? "#B45309" : "#1A1D20"}
+                                                                        fontSize="10px"
+                                                                        borderRadius="md"
+                                                                        w="22px"
+                                                                        h="22px"
+                                                                        display="flex"
+                                                                        alignItems="center"
+                                                                        justifyContent="center"
+                                                                    >
+                                                                        #{currentRank}
+                                                                    </Badge>
+                                                                    {/* --- SANATÇI FOTOĞRAFI BAŞLANGIÇ --- */}
+                                                                    <LazyArtistAvatar
+                                                                        spotifyUserId={session.spotifyUserId}
+                                                                        artistName={artist.artistName}
+                                                                        initialImageUrl={artist.imageUrl}
+                                                                        w="28px"
+                                                                        h="28px"
+                                                                        border="1px solid rgba(0,0,0,0.08)"
+                                                                    />
+                                                                    {/* --- SANATÇI FOTOĞRAFI BİTİŞ --- */}
+                                                                    <HStack spacing={1.5} align="center">
+                                                                        <a
+                                                                            href={`spotify:search:${encodeURIComponent(artist.artistName)}`}
+                                                                            style={{ textDecoration: 'none' }}
+                                                                        >
+                                                                            <Text
+                                                                                fontSize="xs"
+                                                                                fontWeight="semibold"
+                                                                                color="#1A1D20"
+                                                                                isTruncated
+                                                                                maxW="110px"
+                                                                                _hover={{ color: '#10b981', textDecoration: 'underline' }}
+                                                                                transition="color 0.2s"
+                                                                                cursor="pointer"
+                                                                            >
+                                                                                {artist.artistName}
+                                                                            </Text>
+                                                                        </a>
+                                                                        <IconButton
+                                                                            aria-label="Sanatçı Dinleme Analizi"
+                                                                            icon={<FaHistory />}
+                                                                            size="xs"
+                                                                            variant="ghost"
+                                                                            color="gray.400"
+                                                                            _hover={{ color: "#10b981", bg: "rgba(16, 185, 129, 0.1)" }}
+                                                                            onClick={() => handleOpenArtistAnalysis(artist.artistName)}
+                                                                            h="18px"
+                                                                            w="18px"
+                                                                            minW="18px"
+                                                                        />
+                                                                    </HStack>
+                                                                </HStack>
+                                                                <VStack align="end" spacing={0} flexShrink={0}>
+                                                                    <Text fontSize="xs" fontWeight="bold" color="#111111">
+                                                                        {artist.playCount} kez
+                                                                    </Text>
+                                                                    <Text fontSize="9px" color="gray.400">
+                                                                        {artist.totalMinutesPlayed.toLocaleString('tr-TR')} dk
+                                                                    </Text>
+                                                                </VStack>
+                                                            </Flex>
+                                                        );
+                                                    })
+                                                )}
+                                            </VStack>
 
-                                        {artistsPageData.totalPages > 1 && (
-                                            <Flex align="center" justify="space-between" mt={4} pt={3} borderTop="1px solid #E4E7EB">
-                                                <Button
-                                                    size="xs"
-                                                    variant="outline"
-                                                    borderColor="#E4E7EB"
-                                                    bg="white"
-                                                    color="#1A1D20"
-                                                    _hover={{ bg: "#F8FAFC" }}
-                                                    isDisabled={artistPage === 1}
-                                                    onClick={() => setArtistPage(prev => Math.max(prev - 1, 1))}
-                                                >
-                                                    Geri
-                                                </Button>
-                                                <Text fontSize="10px" fontWeight="medium" color="#718096">
-                                                    {artistPage} / {artistsPageData.totalPages} ({artistsPageData.totalCount} sanatçı)
-                                                </Text>
-                                                <Button
-                                                    size="xs"
-                                                    variant="outline"
-                                                    borderColor="#E4E7EB"
-                                                    bg="white"
-                                                    color="#1A1D20"
-                                                    _hover={{ bg: "#F8FAFC" }}
-                                                    isDisabled={artistPage >= artistsPageData.totalPages}
-                                                    onClick={() => setArtistPage(prev => Math.min(prev + 1, artistsPageData.totalPages))}
-                                                >
-                                                    İleri
-                                                </Button>
-                                            </Flex>
-                                        )}
-                                    </CardBody>
-                                </Card>
+                                            {artistsPageData.totalPages > 1 && (
+                                                <Flex align="center" justify="space-between" mt={4} pt={3} borderTop="1px solid #E4E7EB">
+                                                    <Button
+                                                        size="xs"
+                                                        variant="outline"
+                                                        borderColor="#E4E7EB"
+                                                        bg="white"
+                                                        color="#1A1D20"
+                                                        _hover={{ bg: "#F8FAFC" }}
+                                                        isDisabled={artistPage === 1}
+                                                        onClick={() => setArtistPage(prev => Math.max(prev - 1, 1))}
+                                                    >
+                                                        Geri
+                                                    </Button>
+                                                    <Text fontSize="10px" fontWeight="medium" color="#718096">
+                                                        {artistPage} / {artistsPageData.totalPages} ({artistsPageData.totalCount} sanatçı)
+                                                    </Text>
+                                                    <Button
+                                                        size="xs"
+                                                        variant="outline"
+                                                        borderColor="#E4E7EB"
+                                                        bg="white"
+                                                        color="#1A1D20"
+                                                        _hover={{ bg: "#F8FAFC" }}
+                                                        isDisabled={artistPage >= artistsPageData.totalPages}
+                                                        onClick={() => setArtistPage(prev => Math.min(prev + 1, artistsPageData.totalPages))}
+                                                    >
+                                                        İleri
+                                                    </Button>
+                                                </Flex>
+                                            )}
+                                        </CardBody>
+                                    </Card>
+
+                                    {/* --- EN ÇOK DİNLENEN TÜRLER BAŞLANGIÇ --- */}
+                                    {wrappedData?.topGenres && wrappedData.topGenres.length > 0 && (
+                                        <Card bg="white" border="1px solid #E4E7EB" shadow="sm" borderRadius="xl" mt={6}>
+                                            <CardBody>
+                                                <Heading as="h4" size="xs" fontWeight="bold" color="#111111" textTransform="uppercase" letterSpacing="wider" mb={4}>
+                                                    En Çok Dinlenen Türler
+                                                </Heading>
+                                                <VStack spacing={4} align="stretch">
+                                                    {wrappedData.topGenres.slice(0, 7).map((genreCount, index) => {
+                                                        const maxPlayCount = wrappedData.topGenres[0].playCount || 1;
+                                                        const percentage = (genreCount.playCount / maxPlayCount) * 100;
+                                                        
+                                                        return (
+                                                            <Box key={genreCount.genre} w="full">
+                                                                <Flex justify="space-between" align="center" mb={1}>
+                                                                    <Text fontSize="xs" fontWeight="bold" color="#1A1D20">
+                                                                        {index + 1}. {genreCount.genre}
+                                                                    </Text>
+                                                                    <Text fontSize="10px" fontWeight="semibold" color="gray.500">
+                                                                        {genreCount.playCount.toLocaleString('tr-TR')} kez
+                                                                    </Text>
+                                                                </Flex>
+                                                                <Progress 
+                                                                    value={percentage} 
+                                                                    size="xs" 
+                                                                    borderRadius="full" 
+                                                                    colorScheme="teal" 
+                                                                    bg="gray.100"
+                                                                />
+                                                            </Box>
+                                                        );
+                                                    })}
+                                                </VStack>
+                                            </CardBody>
+                                        </Card>
+                                    )}
+                                    {/* --- EN ÇOK DİNLENEN TÜRLER BİTİŞ --- */}
+                                </>
                             )}
                         </Box>
                     </SimpleGrid>
@@ -1022,8 +1160,8 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                         <VStack spacing={4}>
                             <FormControl isRequired>
                                 <FormLabel fontSize="sm" color="#1A1D20">Çalma Listesi Adı</FormLabel>
-                                <Input 
-                                    value={customPlaylistName} 
+                                <Input
+                                    value={customPlaylistName}
                                     onChange={(e) => {
                                         setCustomPlaylistName(e.target.value);
                                         setIsNameManuallyEdited(true);
@@ -1040,9 +1178,9 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                             <SimpleGrid columns={2} spacing={4} w="full">
                                 <FormControl>
                                     <FormLabel fontSize="sm" color="#1A1D20">Başlangıç Yılı</FormLabel>
-                                    <Input 
+                                    <Input
                                         type="number"
-                                        value={startYear} 
+                                        value={startYear}
                                         onChange={(e) => setStartYear(e.target.value)}
                                         placeholder="Örn: 2021"
                                         bg="white"
@@ -1053,9 +1191,9 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                                 </FormControl>
                                 <FormControl>
                                     <FormLabel fontSize="sm" color="#1A1D20">Bitiş Yılı</FormLabel>
-                                    <Input 
+                                    <Input
                                         type="number"
-                                        value={endYear} 
+                                        value={endYear}
                                         onChange={(e) => setEndYear(e.target.value)}
                                         placeholder="Örn: 2025"
                                         bg="white"
@@ -1076,8 +1214,8 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
 
                             <FormControl>
                                 <FormLabel fontSize="sm" color="#1A1D20">Dahil Edilecek Sanatçılar</FormLabel>
-                                <Input 
-                                    value={includedArtists} 
+                                <Input
+                                    value={includedArtists}
                                     onChange={(e) => setIncludedArtists(e.target.value)}
                                     placeholder="Eminem, Paramore, Muse (Virgülle ayırın)"
                                     bg="white"
@@ -1090,8 +1228,8 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
 
                             <FormControl>
                                 <FormLabel fontSize="sm" color="#1A1D20">Hariç Tutulacak Sanatçılar</FormLabel>
-                                <Input 
-                                    value={excludedArtists} 
+                                <Input
+                                    value={excludedArtists}
                                     onChange={(e) => setExcludedArtists(e.target.value)}
                                     placeholder="Coldplay, Taylor Swift (Virgülle ayırın)"
                                     bg="white"
@@ -1104,11 +1242,11 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
 
                             <FormControl>
                                 <FormLabel fontSize="sm" color="#1A1D20">Maksimum Şarkı Sayısı</FormLabel>
-                                <Input 
+                                <Input
                                     type="number"
-                                    min={5} 
-                                    max={1000} 
-                                    value={trackCount} 
+                                    min={5}
+                                    max={1000}
+                                    value={trackCount}
                                     onChange={(e) => setTrackCount(parseInt(e.target.value) || 5)}
                                     bg="white"
                                     borderColor="#C5CBD3"
@@ -1119,8 +1257,8 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                             </FormControl>
 
                             <FormControl pt={2}>
-                                <Checkbox 
-                                    isChecked={fillMissing} 
+                                <Checkbox
+                                    isChecked={fillMissing}
                                     onChange={(e) => setFillMissing(e.target.checked)}
                                     colorScheme="yellow"
                                     color="#1A1D20"
@@ -1129,16 +1267,16 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                                     {useRandom ? "Eksiği Rastgele Şarkılarla Doldur" : "Eksiği Popüler Şarkılarla Doldur"}
                                 </Checkbox>
                                 <FormHelperText color="#718096" fontSize="xs">
-                                    {useRandom 
-                                        ? "Dahil ettiğiniz sanatçılara ait şarkı sayısı limitin (örn. 50) altında kalırsa, çalma listesinin kalan kısmı o yıl aralığındaki diğer rastgele şarkılarınızla tamamlanır." 
+                                    {useRandom
+                                        ? "Dahil ettiğiniz sanatçılara ait şarkı sayısı limitin (örn. 50) altında kalırsa, çalma listesinin kalan kısmı o yıl aralığındaki diğer rastgele şarkılarınızla tamamlanır."
                                         : "Dahil ettiğiniz sanatçılara ait şarkı sayısı limitin (örn. 50) altında kalırsa, çalma listesinin kalan kısmı en popüler diğer şarkılarınızla tamamlanır. Seçilmezse sadece uyan şarkılar listelenir."
                                     }
                                 </FormHelperText>
                             </FormControl>
 
                             <FormControl pt={2}>
-                                <Checkbox 
-                                    isChecked={useRandom} 
+                                <Checkbox
+                                    isChecked={useRandom}
                                     onChange={(e) => setUseRandom(e.target.checked)}
                                     colorScheme="yellow"
                                     color="#1A1D20"
@@ -1156,10 +1294,10 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                         <Button variant="ghost" mr={3} onClick={onCustomClose} colorScheme="gray" color="#718096">
                             İptal
                         </Button>
-                        <Button 
-                            bg="#FDBB30" 
-                            color="#111" 
-                            _hover={{ bg: "#E5A520" }} 
+                        <Button
+                            bg="#FDBB30"
+                            color="#111"
+                            _hover={{ bg: "#E5A520" }}
                             _active={{ bg: "#b45309" }}
                             isLoading={creatingCustom}
                             loadingText="Oluşturuluyor..."
@@ -1204,10 +1342,10 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                         )}
                     </ModalBody>
                     <ModalFooter borderTop="1px solid #E4E7EB" py={3} px={6}>
-                        <Button 
-                            variant="ghost" 
-                            color="#718096" 
-                            _hover={{ color: "#111", bg: "#F8FAFC" }} 
+                        <Button
+                            variant="ghost"
+                            color="#718096"
+                            _hover={{ color: "#111", bg: "#F8FAFC" }}
                             onClick={() => setAnalysisModalOpen(false)}
                             borderRadius="lg"
                             size="sm"
@@ -1245,10 +1383,10 @@ export default function Dashboard({ session, onLogout }: DashboardProps) {
                             boxShadow="lg"
                             flexShrink={0}
                         >
-                            <img 
-                                src={currentlyPlaying.imageUrl} 
-                                alt={currentlyPlaying.title} 
-                                style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                            <img
+                                src={currentlyPlaying.imageUrl}
+                                alt={currentlyPlaying.title}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             />
                         </Box>
                     ) : (

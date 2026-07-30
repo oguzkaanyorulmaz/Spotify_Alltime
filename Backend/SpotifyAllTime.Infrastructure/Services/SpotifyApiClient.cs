@@ -215,6 +215,53 @@ public class SpotifyApiClient : ISpotifyApiClient
         return resultList;
     }
 
+    public async Task<(string? ImageUrl, List<string> Genres)> GetArtistDetailsAsync(string artistName, string accessToken)
+    {
+        var genres = new List<string>();
+        try
+        {
+            // Spotify Arama API'sini kullanarak sanatçının bilgilerini ve profil görselini çekiyoruz (limit=5 yaparak arama algoritmik sapmalarını engelliyoruz)
+            var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.spotify.com/v1/search?q={Uri.EscapeDataString(artistName)}&type=artist&limit=5");
+            Console.WriteLine($"[SpotifyApiClient] Requesting URL: {request.RequestUri}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            var response = await _httpClient.SendAsync(request);
+            Console.WriteLine($"[SpotifyApiClient] Search response status for '{artistName}': {response.StatusCode}");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var result = System.Text.Json.JsonSerializer.Deserialize<SpotifyArtistSearchResponse>(json);
+                var items = result?.Artists?.Items;
+                SpotifyArtistDetail? artist = null;
+                if (items != null && items.Count > 0)
+                {
+                    // Tam isim eşleşmesi (büyük/küçük harf duyarsız) arıyoruz
+                    artist = items.FirstOrDefault(i => string.Equals(i.Name, artistName, StringComparison.OrdinalIgnoreCase))
+                             ?? items[0];
+                }
+                Console.WriteLine($"[SpotifyApiClient] Search result for '{artistName}': Selected Artist ID: {artist?.Id}, Name: {artist?.Name}, Images count: {artist?.Images?.Length ?? 0}");
+                if (artist != null)
+                {
+                    if (artist.Genres != null)
+                    {
+                        genres = artist.Genres;
+                    }
+                    string? imageUrl = null;
+                    if (artist.Images != null && artist.Images.Length > 0)
+                    {
+                        imageUrl = artist.Images[0].Url;
+                        Console.WriteLine($"[SpotifyApiClient] Selected Image URL for '{artistName}': {imageUrl}");
+                    }
+                    return (imageUrl, genres);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SpotifyApiClient] Search artist details failed for '{artistName}': {ex.Message}");
+        }
+        return (null, genres);
+    }
+
     public async Task ReplacePlaylistItemsAsync(string accessToken, string playlistId, List<string> trackUris)
     {
         var request = new HttpRequestMessage(HttpMethod.Put, $"https://api.spotify.com/v1/playlists/{playlistId}/items");
@@ -473,8 +520,26 @@ public class SpotifyApiClient : ISpotifyApiClient
         [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
 
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
         [JsonPropertyName("genres")]
         public List<string>? Genres { get; set; }
+
+        [JsonPropertyName("images")]
+        public SpotifyImage[]? Images { get; set; }
+    }
+
+    private class SpotifyArtistSearchResponse
+    {
+        [JsonPropertyName("artists")]
+        public SpotifyArtistSearchContainer? Artists { get; set; }
+    }
+
+    private class SpotifyArtistSearchContainer
+    {
+        [JsonPropertyName("items")]
+        public List<SpotifyArtistDetail>? Items { get; set; }
     }
 
     private class SpotifyAlbum

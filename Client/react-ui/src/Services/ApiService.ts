@@ -68,8 +68,11 @@ export const ApiService = {
         return await res.json();
     },
 
-    triggerPlaylistSync: async (spotifyUserId: string): Promise<{ message: string; playlistUrl: string }> => {
-        const res = await fetch(`${BASE_URL}/sync/playlist/${spotifyUserId}`, {
+    triggerPlaylistSync: async (spotifyUserId: string, startDate?: string, endDate?: string): Promise<{ message: string; playlistUrl: string }> => {
+        let url = `${BASE_URL}/sync/playlist/${spotifyUserId}?`;
+        if (startDate) url += `startDate=${encodeURIComponent(startDate)}&`;
+        if (endDate) url += `endDate=${encodeURIComponent(endDate)}&`;
+        const res = await fetch(url, {
             method: "POST"
         });
         if (!res.ok) throw new Error("Çalma listesi eşitlemesi tetiklenemedi.");
@@ -152,8 +155,25 @@ export const ApiService = {
         const res = await fetch(`${BASE_URL}/stats/history/artist/${spotifyUserId}?artistName=${encodeURIComponent(artistName)}`);
         if (!res.ok) throw new Error("Sanatçı geçmişi alınamadı.");
         return await res.json();
+    },
+
+    getLazyTrackImage: async (spotifyUserId: string, trackId: string): Promise<{ imageUrl: string | null }> => {
+        const res = await fetch(`${BASE_URL}/stats/track-image/${spotifyUserId}/${trackId}`);
+        if (!res.ok) return { imageUrl: null };
+        return await res.json();
+    },
+
+    getLazyArtistImage: async (spotifyUserId: string, artistName: string): Promise<{ imageUrl: string | null }> => {
+        const res = await fetch(`${BASE_URL}/stats/artist-image/${spotifyUserId}/${encodeURIComponent(artistName)}`);
+        if (!res.ok) return { imageUrl: null };
+        return await res.json();
     }
 };
+
+export interface GenreCountDto {
+    genre: string;
+    playCount: number;
+}
 
 export interface YearlyWrappedDto {
     year: number;
@@ -162,6 +182,10 @@ export interface YearlyWrappedDto {
     uniqueArtistsCount: number;
     topArtistName: string;
     topArtistPlayCount: number;
+    topTrackTitle: string;
+    topTrackArtistName: string;
+    topTrackMinutesPlayed: number;
+    topGenres: GenreCountDto[];
 }
 
 export interface PagedResultDto<T> {
@@ -186,6 +210,7 @@ export interface WrappedArtistDto {
     artistName: string;
     playCount: number;
     totalMinutesPlayed: number;
+    imageUrl?: string
 }
 
 

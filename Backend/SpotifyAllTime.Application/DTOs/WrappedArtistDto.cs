@@ -5,4 +5,5 @@ public class WrappedArtistDto
     public string ArtistName { get; set; } = string.Empty;
     public int PlayCount { get; set; }
     public int TotalMinutesPlayed { get; set; }
+    public string? ImageUrl { get; set; }
 }

@@ -68,5 +68,27 @@ public class StatsController : ControllerBase
         var result = await _statsAppService.GetArtistPlayHistoryAsync(spotifyUserId, artistName);
         return Ok(result);
     }
+
+    [HttpGet("track-image/{spotifyUserId}/{trackId}")]
+    public async Task<IActionResult> GetLazyTrackImage(string spotifyUserId, string trackId)
+    {
+        var imageUrl = await _statsAppService.GetLazyTrackImageAsync(spotifyUserId, trackId);
+        return Ok(new { imageUrl });
+    }
+
+    [HttpGet("artist-image/{spotifyUserId}/{artistName}")]
+    public async Task<IActionResult> GetLazyArtistImage(string spotifyUserId, string artistName)
+    {
+        var imageUrl = await _statsAppService.GetLazyArtistImageAsync(spotifyUserId, artistName);
+        return Ok(new { imageUrl });
+    }
+
+    [HttpGet("test-users")]
+    public async Task<IActionResult> GetTestUsers()
+    {
+        var context = HttpContext.RequestServices.GetRequiredService<SpotifyAllTime.Infrastructure.Persistence.SpotifyDbContext>();
+        var users = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(context.SpotifyUsers);
+        return Ok(users.Select(u => new { u.SpotifyUserId, u.DisplayName }));
+    }
 }
 
