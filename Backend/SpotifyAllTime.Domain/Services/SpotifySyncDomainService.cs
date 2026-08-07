@@ -151,7 +151,7 @@ public class SpotifySyncDomainService : ISpotifySyncDomainService
         return targetPlaylistId;
     }
 
-    public async Task<(bool IsPlaying, string Title, string Artist, string Album, string? ImageUrl)?> GetCurrentlyPlayingAsync(string spotifyUserId)
+    public async Task<(bool IsPlaying, string Title, string Artist, string Album, string? ImageUrl, List<QueueItemDto> Queue, QueueItemDto? Previous)?> GetCurrentlyPlayingAsync(string spotifyUserId)
     {
         var user = await _userRepository.GetBySpotifyIdAsync(spotifyUserId);
         if (user == null) return null;
@@ -186,7 +186,32 @@ public class SpotifySyncDomainService : ISpotifySyncDomainService
             }
         }
 
-        return result;
+        if (result == null) return null;
+
+        var queue = await _spotifyApiClient.GetPlaybackQueueAsync(user.AccessToken);
+
+        QueueItemDto? previousSong = null;
+        try
+        {
+            var recentlyPlayed = await _spotifyApiClient.GetRecentlyPlayedAsync(user.AccessToken, 5);
+            var prevItem = recentlyPlayed.FirstOrDefault(r => r.TrackName != result.Value.Title);
+            if (prevItem.TrackUri != null)
+            {
+                previousSong = new QueueItemDto
+                {
+                    SpotifyTrackUri = prevItem.TrackUri,
+                    Title = prevItem.TrackName,
+                    Artist = prevItem.ArtistName,
+                    ImageUrl = prevItem.ImageUrl
+                };
+            }
+        }
+        catch (Exception)
+        {
+            // Ignore recently played fetch error
+        }
+
+        return (result.Value.IsPlaying, result.Value.Title, result.Value.Artist, result.Value.Album, result.Value.ImageUrl, queue, previousSong);
     }
 
     public async Task<string> SyncCustomPlaylistAsync(
@@ -297,5 +322,79 @@ public class SpotifySyncDomainService : ISpotifySyncDomainService
     public async Task<List<int>> GetAvailableYearsAsync(string spotifyUserId)
     {
         return await _streamingRecordRepository.GetAvailableYearsAsync(spotifyUserId);
+    }
+
+        private async Task<string?> GetValidAccessTokenAsync(string spotifyUserId)
+    {
+        var user = await _userRepository.GetBySpotifyIdAsync(spotifyUserId);
+        if (user == null) return null;
+
+        if (user.IsTokenExpired())
+        {
+            try
+            {
+                var (accessToken, expiresInSeconds) = await _spotifyApiClient.RefreshTokenAsync(user.RefreshToken);
+                user.UpdateTokens(accessToken, user.RefreshToken, expiresInSeconds);
+                await _userRepository.UpdateAsync(user);
+            }
+            catch (Exception) { return null; }
+        }
+
+        return user.AccessToken;
+    }
+
+    public async Task NextTrackAsync(string spotifyUserId)
+    {
+        var accessToken = await GetValidAccessTokenAsync(spotifyUserId);
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            await _spotifyApiClient.NextTrackAsync(accessToken);
+        }
+    }
+
+    public async Task PreviousTrackAsync(string spotifyUserId)
+    {
+        var accessToken = await GetValidAccessTokenAsync(spotifyUserId);
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            await _spotifyApiClient.PreviousTrackAsync(accessToken);
+        }
+    }
+
+    public async Task ResumePlaybackAsync(string spotifyUserId)
+    {
+        var accessToken = await GetValidAccessTokenAsync(spotifyUserId);
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            await _spotifyApiClient.ResumePlaybackAsync(accessToken);
+        }
+    }
+
+    public async Task PausePlaybackAsync(string spotifyUserId)
+    {
+        var accessToken = await GetValidAccessTokenAsync(spotifyUserId);
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            await _spotifyApiClient.PausePlaybackAsync(accessToken);
+        }
+    }
+
+    public async Task PlayTrackAsync(string spotifyUserId, string trackUri)
+    {
+        var accessToken = await GetValidAccessTokenAsync(spotifyUserId);
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            await _spotifyApiClient.PlayTrackAsync(accessToken, trackUri);
+        }
+    }
+
+    public async Task<List<SpotifyPlaylistDto>> GetUserPlaylistsAsync(string spotifyUserId)
+    {
+        var accessToken = await GetValidAccessTokenAsync(spotifyUserId);
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            return await _spotifyApiClient.GetUserPlaylistsAsync(accessToken);
+        }
+        return new List<SpotifyPlaylistDto>();
     }
 }

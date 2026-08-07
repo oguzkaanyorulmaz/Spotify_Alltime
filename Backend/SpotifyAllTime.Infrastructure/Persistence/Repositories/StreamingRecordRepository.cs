@@ -139,63 +139,57 @@ public class StreamingRecordRepository : IStreamingRecordRepository
         return (totalMs, uniqueTracks, uniqueArtists, topArtist, topArtistCount);
     }
 
-    public async Task<List<(Track Track, int TotalMinutes)>> GetTopTracksPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy)
+    public async Task<List<(Track Track, int TotalMinutes)>> GetTopTracksPagedAsync(
+    string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy, string? search = null)
+{
+    var query = _context.StreamingRecords.Where(r => r.SpotifyUserId == spotifyUserId);
+    if (startDate.HasValue) query = query.Where(r => r.PlayedAt >= startDate.Value);
+    if (endDate.HasValue) query = query.Where(r => r.PlayedAt <= endDate.Value);
+    var joined = query.Join(_context.Tracks, r => r.SpotifyTrackUri, t => t.SpotifyTrackUri, (r, t) => new { r, t });
+    // Arama filtresi:
+    if (!string.IsNullOrWhiteSpace(search))
     {
-        var query = _context.StreamingRecords.Where(r => r.SpotifyUserId == spotifyUserId);
-
-        if (startDate.HasValue)
-        {
-            query = query.Where(r => r.PlayedAt >= startDate.Value);
-        }
-
-        if (endDate.HasValue)
-        {
-            query = query.Where(r => r.PlayedAt <= endDate.Value);
-        }
-
-        var grouped = query
-            .Join(_context.Tracks, r => r.SpotifyTrackUri, t => t.SpotifyTrackUri, (r, t) => new { r, t })
-            .GroupBy(x => new { x.t.SpotifyTrackUri, x.t.TrackName, x.t.ArtistName, x.t.AlbumName, x.t.ImageUrl })
-            .Select(g => new
-            {
-                SpotifyTrackUri = g.Key.SpotifyTrackUri,
-                TrackName = g.Key.TrackName,
-                ArtistName = g.Key.ArtistName,
-                AlbumName = g.Key.AlbumName,
-                ImageUrl = g.Key.ImageUrl,
-                PlayCount = g.Count(),
-                TotalMs = g.Sum(x => (long)x.r.MsPlayed)
-            });
-
-        if (sortBy == "duration")
-        {
-            grouped = grouped.OrderByDescending(x => x.TotalMs);
-        }
-        else
-        {
-            grouped = grouped.OrderByDescending(x => x.PlayCount);
-        }
-
-        var results = await grouped
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        return results.Select(t => (
-            new Track
-            {
-                SpotifyTrackUri = t.SpotifyTrackUri,
-                TrackName = t.TrackName,
-                ArtistName = t.ArtistName,
-                AlbumName = t.AlbumName,
-                PlayCount = t.PlayCount,
-                ImageUrl = t.ImageUrl
-            },
-            (int)(t.TotalMs / 60000)
-        )).ToList();
+        joined = joined.Where(x => x.t.ArtistName.Contains(search) || x.t.TrackName.Contains(search));
     }
+    var grouped = joined
+        .GroupBy(x => new { x.t.SpotifyTrackUri, x.t.TrackName, x.t.ArtistName, x.t.AlbumName, x.t.ImageUrl })
+        .Select(g => new
+        {
+            SpotifyTrackUri = g.Key.SpotifyTrackUri,
+            TrackName = g.Key.TrackName,
+            ArtistName = g.Key.ArtistName,
+            AlbumName = g.Key.AlbumName,
+            ImageUrl = g.Key.ImageUrl,
+            PlayCount = g.Count(),
+            TotalMs = g.Sum(x => (long)x.r.MsPlayed)
+        });
+    if (sortBy == "duration")
+    {
+        grouped = grouped.OrderByDescending(x => x.TotalMs);
+    }
+    else
+    {
+        grouped = grouped.OrderByDescending(x => x.PlayCount);
+    }
+    var results = await grouped
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
+    return results.Select(t => (
+        new Track
+        {
+            SpotifyTrackUri = t.SpotifyTrackUri,
+            TrackName = t.TrackName,
+            ArtistName = t.ArtistName,
+            AlbumName = t.AlbumName,
+            PlayCount = t.PlayCount,
+            ImageUrl = t.ImageUrl
+        },
+        (int)(t.TotalMs / 60000)
+    )).ToList();
+}
 
-    public async Task<List<(string ArtistName, int PlayCount, int TotalMinutes, string? ImageUrl)>> GetTopArtistsPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy)
+    public async Task<List<(string ArtistName, int PlayCount, int TotalMinutes, string? ImageUrl)>> GetTopArtistsPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy, string? search = null)
 {
     var query = _context.StreamingRecords.Where(r => r.SpotifyUserId == spotifyUserId);
     if (startDate.HasValue)
@@ -239,22 +233,19 @@ public class StreamingRecordRepository : IStreamingRecordRepository
     )).ToList();
 }
 
-    public async Task<int> GetTopTracksCountAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate)
+   public async Task<int> GetTopTracksCountAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, string? search = null)
+{
+    var query = _context.StreamingRecords.Where(r => r.SpotifyUserId == spotifyUserId);
+    if (startDate.HasValue) query = query.Where(r => r.PlayedAt >= startDate.Value);
+    if (endDate.HasValue) query = query.Where(r => r.PlayedAt <= endDate.Value);
+    if (!string.IsNullOrWhiteSpace(search))
     {
-        var query = _context.StreamingRecords.Where(r => r.SpotifyUserId == spotifyUserId);
-
-        if (startDate.HasValue)
-        {
-            query = query.Where(r => r.PlayedAt >= startDate.Value);
-        }
-
-        if (endDate.HasValue)
-        {
-            query = query.Where(r => r.PlayedAt <= endDate.Value);
-        }
-
-        return await query.Select(r => r.SpotifyTrackUri).Distinct().CountAsync();
+        var joined = query.Join(_context.Tracks, r => r.SpotifyTrackUri, t => t.SpotifyTrackUri, (r, t) => new { r, t })
+                          .Where(x => x.t.ArtistName.Contains(search) || x.t.TrackName.Contains(search));
+        return await joined.Select(x => x.t.SpotifyTrackUri).Distinct().CountAsync();
     }
+    return await query.Select(r => r.SpotifyTrackUri).Distinct().CountAsync();
+}
 
     public async Task<int> GetTopArtistsCountAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate)
     {

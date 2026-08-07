@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -78,7 +79,7 @@ public class SpotifyApiClient : ISpotifyApiClient
         return (result!.Id, result.DisplayName ?? string.Empty, result.Email ?? string.Empty);
     }
 
-    public async Task<List<(string TrackUri, string TrackName, string ArtistName, string AlbumName, DateTime PlayedAt, int MsPlayed)>> GetRecentlyPlayedAsync(string accessToken, int limit = 50)
+    public async Task<List<(string TrackUri, string TrackName, string ArtistName, string AlbumName, DateTime PlayedAt, int MsPlayed, string? ImageUrl)>> GetRecentlyPlayedAsync(string accessToken, int limit = 50)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.spotify.com/v1/me/player/recently-played?limit={limit}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -87,7 +88,7 @@ public class SpotifyApiClient : ISpotifyApiClient
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<RecentlyPlayedResponse>();
-        var tracks = new List<(string, string, string, string, DateTime, int)>();
+        var tracks = new List<(string, string, string, string, DateTime, int, string?)>();
 
         if (result?.Items != null)
         {
@@ -99,6 +100,9 @@ public class SpotifyApiClient : ISpotifyApiClient
                         ? item.Track.Artists[0].Name 
                         : "Unknown Artist";
                     var albumName = item.Track.Album != null ? item.Track.Album.Name : "Unknown Album";
+                    var imageUrl = item.Track.Album?.Images != null && item.Track.Album.Images.Length > 0
+                        ? item.Track.Album.Images[0].Url
+                        : null;
                     
                     tracks.Add((
                         item.Track.Uri,
@@ -106,7 +110,8 @@ public class SpotifyApiClient : ISpotifyApiClient
                         artistName,
                         albumName,
                         item.PlayedAt.ToUniversalTime(),
-                        item.Track.DurationMs
+                        item.Track.DurationMs,
+                        imageUrl
                     ));
                 }
             }
@@ -431,6 +436,163 @@ public class SpotifyApiClient : ISpotifyApiClient
         return (false, lastItem.Track.Name, artistName, lastItem.Track.Album?.Name ?? string.Empty, imageUrl);
     }
 
+    public async Task NextTrackAsync(string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.spotify.com/v1/me/player/next");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Spotify Player API error (NextTrack) returned status {response.StatusCode}: {content}");
+        }
+    }
+
+    public async Task PreviousTrackAsync(string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.spotify.com/v1/me/player/previous");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Spotify Player API error (PreviousTrack) returned status {response.StatusCode}: {content}");
+        }
+    }
+
+    public async Task ResumePlaybackAsync(string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Put, "https://api.spotify.com/v1/me/player/play");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Spotify Player API error (ResumePlayback) returned status {response.StatusCode}: {content}");
+        }
+    }
+
+    public async Task PausePlaybackAsync(string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Put, "https://api.spotify.com/v1/me/player/pause");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Spotify Player API error (PausePlayback) returned status {response.StatusCode}: {content}");
+        }
+    }
+
+    public async Task PlayTrackAsync(string accessToken, string trackUri)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Put, "https://api.spotify.com/v1/me/player/play");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        var payload = new { uris = new[] { trackUri } };
+        request.Content = JsonContent.Create(payload);
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Spotify Player API error (PlayTrack) returned status {response.StatusCode}: {content}");
+        }
+    }
+
+    public async Task<List<QueueItemDto>> GetPlaybackQueueAsync(string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/player/queue");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            return new List<QueueItemDto>();
+        }
+
+        var jsonString = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(jsonString);
+        var root = document.RootElement;
+        
+        var list = new List<QueueItemDto>();
+        if (root.TryGetProperty("queue", out var queueElement) && queueElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in queueElement.EnumerateArray())
+            {
+                var title = item.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
+                var uri = item.TryGetProperty("uri", out var uriProp) ? uriProp.GetString() ?? "" : "";
+                
+                var artist = "";
+                if (item.TryGetProperty("artists", out var artistsProp) && artistsProp.ValueKind == JsonValueKind.Array)
+                {
+                    var artistNames = new List<string>();
+                    foreach (var art in artistsProp.EnumerateArray())
+                    {
+                        if (art.TryGetProperty("name", out var artNameProp))
+                        {
+                            artistNames.Add(artNameProp.GetString() ?? "");
+                        }
+                    }
+                    artist = string.Join(", ", artistNames);
+                }
+
+                var imageUrl = "";
+                if (item.TryGetProperty("album", out var albumProp) && albumProp.TryGetProperty("images", out var imagesProp) && imagesProp.ValueKind == JsonValueKind.Array && imagesProp.GetArrayLength() > 0)
+                {
+                    var firstImage = imagesProp[0];
+                    if (firstImage.TryGetProperty("url", out var urlProp))
+                    {
+                        imageUrl = urlProp.GetString() ?? "";
+                    }
+                }
+
+                list.Add(new QueueItemDto
+                {
+                    SpotifyTrackUri = uri,
+                    Title = title,
+                    Artist = artist,
+                    ImageUrl = imageUrl
+                });
+            }
+        }
+        return list;
+    }
+
+    public async Task<List<SpotifyPlaylistDto>> GetUserPlaylistsAsync(string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/playlists?limit=50");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        var responseString = await response.Content.ReadAsStringAsync();
+        Console.WriteLine($"[SpotifyApiClient] Playlists raw: {responseString}");
+        var result = JsonSerializer.Deserialize<PlaylistsResponse>(responseString);
+        var playlistsList = new List<SpotifyPlaylistDto>();
+
+        if (result?.Items != null)
+        {
+            foreach (var item in result.Items)
+            {
+                var imageUrl = item.Images != null && item.Images.Length > 0
+                    ? item.Images[0].Url
+                    : null;
+
+                playlistsList.Add(new SpotifyPlaylistDto
+                {
+                    Id = item.Id,
+                    Name = item.Name,
+                    ImageUrl = imageUrl,
+                    ExternalUrl = item.ExternalUrls?.Spotify ?? string.Empty,
+                    TrackCount = item.Tracks?.Total ?? 0,
+                    OwnerName = item.Owner?.DisplayName ?? string.Empty
+                });
+            }
+        }
+
+        return playlistsList;
+    }
+
+
     private class CreatePlaylistResponse
     {
         [JsonPropertyName("id")]
@@ -564,5 +726,50 @@ public class SpotifyApiClient : ISpotifyApiClient
 
         [JsonPropertyName("item")]
         public SpotifyTrack? Item { get; set; }
+    }
+
+    private class PlaylistsResponse
+    {
+        [JsonPropertyName("items")]
+        public List<SpotifyPlaylist>? Items { get; set; }
+    }
+
+    private class SpotifyPlaylist
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("images")]
+        public SpotifyImage[]? Images { get; set; }
+
+        [JsonPropertyName("external_urls")]
+        public SpotifyExternalUrls? ExternalUrls { get; set; }
+
+        [JsonPropertyName("items")]
+        public SpotifyPlaylistTracks? Tracks { get; set; }
+
+        [JsonPropertyName("owner")]
+        public SpotifyPlaylistOwner? Owner { get; set; }
+    }
+
+    private class SpotifyExternalUrls
+    {
+        [JsonPropertyName("spotify")]
+        public string Spotify { get; set; } = string.Empty;
+    }
+
+    private class SpotifyPlaylistTracks
+    {
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+    }
+
+    private class SpotifyPlaylistOwner
+    {
+        [JsonPropertyName("display_name")]
+        public string DisplayName { get; set; } = string.Empty;
     }
 }

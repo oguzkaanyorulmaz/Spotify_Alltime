@@ -12,21 +12,42 @@ const config = {
 const theme = extendTheme({
     config,
     fonts: {
-        heading: `'Outfit', sans-serif`,
-        body: `'Plus Jakarta Sans', sans-serif`,
+        heading: `'Plus Jakarta Sans', 'Inter', 'Outfit', sans-serif`,
+        body: `'Plus Jakarta Sans', 'Inter', sans-serif`,
     },
     colors: {
         brand: {
-            50: '#fffbeb',
-            100: '#fef3c7',
-            200: '#fde68a',
-            300: '#fcd34d',
-            400: '#fbbf24',
-            500: '#FDBB30', // FraudGuard primary yellow
-            600: '#E5A520',
-            700: '#b45309',
-            800: '#92400e',
-            900: '#78350f',
+            50: '#ecfdf5',
+            100: '#d1fae5',
+            200: '#a7f3d0',
+            300: '#6ee7b7',
+            400: '#34d399',
+            500: '#1DB954',
+            600: '#1ed760',
+            700: '#059669',
+            800: '#065f46',
+            900: '#064e3b',
+        }
+    },
+    styles: {
+        global: {
+            body: {
+                bg: '#f5f5f0',
+                color: '#1a1a2e',
+            }
+        }
+    },
+    components: {
+        Modal: {
+            baseStyle: {
+                dialog: {
+                    bg: '#ffffff',
+                },
+                overlay: {
+                    bg: 'rgba(0, 0, 0, 0.4)',
+                    backdropFilter: 'blur(8px)',
+                }
+            }
         }
     }
 })

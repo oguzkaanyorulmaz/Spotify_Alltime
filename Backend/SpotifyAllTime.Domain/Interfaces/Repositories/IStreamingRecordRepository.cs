@@ -13,9 +13,9 @@ public interface IStreamingRecordRepository
     Task<List<string>> GetCustomFilteredTrackUrisAsync(string spotifyUserId, int? startYear, int? endYear, List<string>? includedArtists, List<string>? excludedArtists, int trackCount, bool useRandom);
     Task<List<int>> GetAvailableYearsAsync(string spotifyUserId);
     Task<(long TotalMs, int UniqueTracks, int UniqueArtists, string TopArtist, int TopArtistCount)> GetWrappedStatsAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate);
-    Task<List<(Track Track, int TotalMinutes)>> GetTopTracksPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy);
-    Task<List<(string ArtistName, int PlayCount, int TotalMinutes, string? ImageUrl)>> GetTopArtistsPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy);
-    Task<int> GetTopTracksCountAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate);
+    Task<List<(Track Track, int TotalMinutes)>> GetTopTracksPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy, string? search = null);
+    Task<List<(string ArtistName, int PlayCount, int TotalMinutes, string? ImageUrl)>> GetTopArtistsPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy, string? search = null);
+    Task<int> GetTopTracksCountAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, string? search = null);
     Task<int> GetTopArtistsCountAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate);
     Task<List<(string Period, int PlayCount)>> GetTrackPlayHistoryAsync(string spotifyUserId, string trackUri);
     Task<List<(string Period, int PlayCount)>> GetArtistPlayHistoryAsync(string spotifyUserId, string artistName);

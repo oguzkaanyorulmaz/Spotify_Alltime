@@ -23,7 +23,7 @@ public class AuthController : ControllerBase
     [HttpGet("login-url")]
     public IActionResult GetLoginUrl([FromQuery] string redirectUri)
     {
-        var scopes = "user-read-private user-read-email user-read-recently-played user-read-currently-playing user-read-playback-state playlist-modify-public playlist-modify-private";
+        var scopes = "user-read-private user-read-email user-read-recently-played user-read-currently-playing user-read-playback-state playlist-modify-public playlist-modify-private user-modify-playback-state playlist-read-private playlist-read-collaborative";
         var url = $"https://accounts.spotify.com/authorize?response_type=code&client_id={_settings.ClientId}&scope={Uri.EscapeDataString(scopes)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&show_dialog=true";
         
         return Ok(new { loginUrl = url });

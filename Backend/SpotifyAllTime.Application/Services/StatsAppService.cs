@@ -143,10 +143,11 @@ public class StatsAppService : IStatsAppService
         };
     }
 
-    public async Task<PagedResultDto<WrappedTrackDto>> GetTopTracksPagedAsync(string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy)
+    public async Task<PagedResultDto<WrappedTrackDto>> GetTopTracksPagedAsync(
+        string spotifyUserId, DateTime? startDate, DateTime? endDate, int page, int pageSize, string sortBy, string? search = null)
     {
-        var totalCount = await _streamingRecordRepository.GetTopTracksCountAsync(spotifyUserId, startDate, endDate);
-        var topTracksData = await _streamingRecordRepository.GetTopTracksPagedAsync(spotifyUserId, startDate, endDate, page, pageSize, sortBy);
+        var totalCount = await _streamingRecordRepository.GetTopTracksCountAsync(spotifyUserId, startDate, endDate, search);
+        var topTracksData = await _streamingRecordRepository.GetTopTracksPagedAsync(spotifyUserId, startDate, endDate, page, pageSize, sortBy, search);
 
         Console.WriteLine($"[StatsAppService] GetTopTracksPagedAsync - page: {page}, pageSize: {pageSize}. Total loaded tracks: {topTracksData.Count}");
 

@@ -1,0 +1,79 @@
+/* From Uiverse.io by 3bdel3ziz-T */ 
+.custom-select-wrapper {
+  position: relative;
+  z-index: 100;
+}
+
+.select {
+  width: 200px;
+  cursor: pointer;
+  position: relative;
+  transition: 300ms;
+  color: white;
+}
+
+.selected {
+  background-color: #2a2f3b;
+  padding: 8px 12px;
+  border-radius: 10px;
+  position: relative;
+  z-index: 100000;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.arrow {
+  position: relative;
+  right: 0px;
+  height: 16px;
+  width: 16px;
+  fill: white;
+  z-index: 100000;
+  transition: 300ms;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  padding: 5px;
+  background-color: #2a2f3b;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transition: 300ms;
+  margin-top: 5px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 99999;
+}
+
+.select:hover .options {
+  opacity: 1;
+  visibility: visible;
+}
+
+.select:hover .selected .arrow {
+  transform: rotate(180deg);
+}
+
+.option {
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: 300ms;
+  background-color: #2a2f3b;
+  width: 100%;
+  font-size: 13px;
+  color: white;
+  box-sizing: border-box;
+}
+
+.option:hover {
+  background-color: #323741;
+}

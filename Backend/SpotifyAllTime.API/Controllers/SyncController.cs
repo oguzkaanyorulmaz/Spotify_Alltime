@@ -45,7 +45,21 @@ public class SyncController : ControllerBase
             title = result.Value.Title, 
             artist = result.Value.Artist, 
             album = result.Value.Album, 
-            imageUrl = result.Value.ImageUrl 
+            imageUrl = result.Value.ImageUrl,
+            queue = result.Value.Queue.Select(q => new
+            {
+                spotifyTrackId = q.SpotifyTrackUri.StartsWith("spotify:track:") ? q.SpotifyTrackUri.Substring("spotify:track:".Length) : q.SpotifyTrackUri,
+                title = q.Title,
+                artist = q.Artist,
+                imageUrl = q.ImageUrl
+            }).ToList(),
+            previous = result.Value.Previous == null ? null : new
+            {
+                spotifyTrackId = result.Value.Previous.SpotifyTrackUri.StartsWith("spotify:track:") ? result.Value.Previous.SpotifyTrackUri.Substring("spotify:track:".Length) : result.Value.Previous.SpotifyTrackUri,
+                title = result.Value.Previous.Title,
+                artist = result.Value.Previous.Artist,
+                imageUrl = result.Value.Previous.ImageUrl
+            }
         });
     }
 
@@ -79,5 +93,54 @@ public class SyncController : ControllerBase
     {
         var years = await _syncDomainService.GetAvailableYearsAsync(spotifyUserId);
         return Ok(years);
+    }
+
+    [HttpPost("player/next/{spotifyUserId}")]
+    public async Task<IActionResult> NextTrack(string spotifyUserId)
+    {
+        await _syncDomainService.NextTrackAsync(spotifyUserId);
+        return Ok(new { Message = "Next track skip triggered." });
+    }
+
+    [HttpPost("player/previous/{spotifyUserId}")]
+    public async Task<IActionResult> PreviousTrack(string spotifyUserId)
+    {
+        await _syncDomainService.PreviousTrackAsync(spotifyUserId);
+        return Ok(new { Message = "Previous track skip triggered." });
+    }
+
+    [HttpPost("player/pause/{spotifyUserId}")]
+    public async Task<IActionResult> PausePlayback(string spotifyUserId)
+    {
+        await _syncDomainService.PausePlaybackAsync(spotifyUserId);
+        return Ok(new { Message = "Playback paused." });
+    }
+
+    [HttpPost("player/resume/{spotifyUserId}")]
+    public async Task<IActionResult> ResumePlayback(string spotifyUserId)
+    {
+        await _syncDomainService.ResumePlaybackAsync(spotifyUserId);
+        return Ok(new { Message = "Playback resumed." });
+    }
+
+    [HttpPost("player/play/{spotifyUserId}")]
+    public async Task<IActionResult> PlayTrack(string spotifyUserId, [FromQuery] string trackUri)
+    {
+        await _syncDomainService.PlayTrackAsync(spotifyUserId, trackUri);
+        return Ok(new { Message = "Playback started." });
+    }
+
+    [HttpGet("playlists/{spotifyUserId}")]
+    public async Task<IActionResult> GetUserPlaylists(string spotifyUserId)
+    {
+        try
+        {
+            var playlists = await _syncDomainService.GetUserPlaylistsAsync(spotifyUserId);
+            return Ok(playlists);
+        }
+        catch (System.Exception ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
     }
 }

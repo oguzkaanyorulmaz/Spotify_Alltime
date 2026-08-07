@@ -16,6 +16,27 @@ export interface CurrentlyPlayingDto {
     artist: string;
     album: string;
     imageUrl?: string;
+    queue?: {
+        spotifyTrackId: string;
+        title: string;
+        artist: string;
+        imageUrl?: string;
+    }[];
+    previous?: {
+        spotifyTrackId: string;
+        title: string;
+        artist: string;
+        imageUrl?: string;
+    };
+}
+
+export interface SpotifyPlaylistDto {
+    id: string;
+    name: string;
+    imageUrl?: string;
+    externalUrl: string;
+    trackCount: number;
+    ownerName: string;
 }
 
 export const ApiService = {
@@ -85,6 +106,42 @@ export const ApiService = {
         return await res.json();
     },
 
+    getUserPlaylists: async (spotifyUserId: string): Promise<SpotifyPlaylistDto[]> => {
+        const res = await fetch(`${BASE_URL}/sync/playlists/${spotifyUserId}`);
+        if (!res.ok) throw new Error("Çalma listeleriniz alınamadı.");
+        return await res.json();
+    },
+
+    playerNext: async (spotifyUserId: string): Promise<any> => {
+        const res = await fetch(`${BASE_URL}/sync/player/next/${spotifyUserId}`, { method: "POST" });
+        if (!res.ok) throw new Error("Şarkı geçilemedi.");
+        return await res.json();
+    },
+
+    playerPrevious: async (spotifyUserId: string): Promise<any> => {
+        const res = await fetch(`${BASE_URL}/sync/player/previous/${spotifyUserId}`, { method: "POST" });
+        if (!res.ok) throw new Error("Önceki şarkıya dönülemedi.");
+        return await res.json();
+    },
+
+    playerPause: async (spotifyUserId: string): Promise<any> => {
+        const res = await fetch(`${BASE_URL}/sync/player/pause/${spotifyUserId}`, { method: "POST" });
+        if (!res.ok) throw new Error("Şarkı durdurulamadı.");
+        return await res.json();
+    },
+
+    playerResume: async (spotifyUserId: string): Promise<any> => {
+        const res = await fetch(`${BASE_URL}/sync/player/resume/${spotifyUserId}`, { method: "POST" });
+        if (!res.ok) throw new Error("Şarkı oynatılamadı.");
+        return await res.json();
+    },
+
+    playerPlay: async (spotifyUserId: string, trackUri: string): Promise<any> => {
+        const res = await fetch(`${BASE_URL}/sync/player/play/${spotifyUserId}?trackUri=${encodeURIComponent(trackUri)}`, { method: "POST" });
+        if (!res.ok) throw new Error("Şarkı oynatılamadı.");
+        return await res.json();
+    },
+
     createCustomPlaylist: async (
         spotifyUserId: string,
         payload: {
@@ -127,14 +184,16 @@ export const ApiService = {
         return await res.json();
     },
 
-    getTopTracksPaged: async (spotifyUserId: string, startDate?: string, endDate?: string, page = 1, pageSize = 100, sortBy = "playcount"): Promise<PagedResultDto<WrappedTrackDto>> => {
+    getTopTracksPaged: async (spotifyUserId: string, startDate?: string, endDate?: string, page = 1, pageSize = 100, sortBy = "playcount", search?: string): Promise<PagedResultDto<WrappedTrackDto>> => {
         let url = `${BASE_URL}/stats/wrapped/tracks/${spotifyUserId}?page=${page}&pageSize=${pageSize}&sortBy=${sortBy}&`;
         if (startDate) url += `startDate=${encodeURIComponent(startDate)}&`;
         if (endDate) url += `endDate=${encodeURIComponent(endDate)}&`;
+        if (search) url += `search=${encodeURIComponent(search)}&`; // Yeni alan
         const res = await fetch(url);
         if (!res.ok) throw new Error("Şarkı listesi alınamadı.");
         return await res.json();
     },
+
 
     getTopArtistsPaged: async (spotifyUserId: string, startDate?: string, endDate?: string, page = 1, pageSize = 10, sortBy = "playcount"): Promise<PagedResultDto<WrappedArtistDto>> => {
         let url = `${BASE_URL}/stats/wrapped/artists/${spotifyUserId}?page=${page}&pageSize=${pageSize}&sortBy=${sortBy}&`;

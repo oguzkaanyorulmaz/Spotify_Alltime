@@ -1,0 +1,174 @@
+.chroma-grid-root {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.chroma-grid-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 250px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.chroma-grid-card:hover {
+  border-color: var(--card-border) !important;
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+.chroma-grid-card.dragging {
+  opacity: 0.3 !important;
+  border: 2px dashed #1DB954 !important;
+  box-shadow: none !important;
+  transform: scale(0.97);
+}
+
+.chroma-grid-card-spotlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  z-index: 2;
+  opacity: 0;
+}
+
+.chroma-grid-card:hover .chroma-grid-card-spotlight {
+  opacity: 1;
+}
+
+.chroma-grid-card-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  padding: 12px;
+  box-sizing: border-box;
+  background-color: transparent;
+}
+
+.chroma-grid-card-image-container {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background-color: #f3f4f6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.chroma-grid-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.chroma-grid-card-footer {
+  position: relative;
+  z-index: 1;
+  padding: 12px 14px 16px 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
+}
+
+.chroma-grid-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chroma-grid-card-handle {
+  font-size: 0.75rem;
+  color: #1DB954;
+  font-weight: 800;
+  text-align: right;
+  background-color: rgba(30, 215, 84, 0.08);
+  padding: 3px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.chroma-grid-card-subtitle {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+  grid-column: span 2;
+  font-weight: 500;
+}
+
+.chroma-grid-card.always-colorful .chroma-grid-card-footer {
+  filter: grayscale(1) opacity(0.8);
+  transition: filter 0.3s ease;
+}
+
+.chroma-grid-card.always-colorful:hover .chroma-grid-card-footer {
+  filter: none;
+}
+
+.chroma-grid-pin-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  opacity: 0;
+  transform: scale(0.9);
+  transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  color: #6b7280;
+}
+
+/* Make pin button visible when card is hovered or if card is already pinned */
+.chroma-grid-card:hover .chroma-grid-pin-button,
+.chroma-grid-card.pinned .chroma-grid-pin-button {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.chroma-grid-pin-button:hover {
+  background: #ffffff;
+  transform: scale(1.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: #1a1a2e;
+}
+
+.chroma-grid-pin-button.is-pinned {
+  background: #1DB954;
+  border-color: #1DB954;
+  color: white;
+}
+
+.chroma-grid-pin-button.is-pinned:hover {
+  background: #1ed760;
+  border-color: #1ed760;
+}

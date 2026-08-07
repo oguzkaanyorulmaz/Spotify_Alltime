@@ -36,9 +36,10 @@ public class StatsController : ControllerBase
         [FromQuery] DateTime? endDate, 
         [FromQuery] int page = 1, 
         [FromQuery] int pageSize = 50, 
-        [FromQuery] string sortBy = "playcount")
+        [FromQuery] string sortBy = "playcount",
+        [FromQuery] string? search = null)
     {
-        var result = await _statsAppService.GetTopTracksPagedAsync(spotifyUserId, startDate, endDate, page, pageSize, sortBy);
+        var result = await _statsAppService.GetTopTracksPagedAsync(spotifyUserId, startDate, endDate, page, pageSize, sortBy, search);
         return Ok(result);
     }
 
